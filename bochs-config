@@ -22,7 +22,7 @@ cpuid: brand_string="              Intel(R) Pentium(R) 4 CPU        "
 
 print_timestamps: enabled=0
 debugger_log: -
-magic_break: enabled=0
+magic_break: enabled=1
 port_e9_hack: enabled=0
 private_colormap: enabled=0
 clock: sync=slowdown, time0=local, rtc_sync=0
