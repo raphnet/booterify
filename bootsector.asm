@@ -1,9 +1,7 @@
 org 7c00h
 bits 16
 cpu 8086
-[map symbols map.map]
-
-%define SECTORS_PER_TRACK	9
+[map symbols bootsector.map]
 
 %define DESTINATION_SEGMENT	1000H
 %define FIRST_SECTOR		2
@@ -12,8 +10,13 @@ cpu 8086
 init:
 	jmp 0000:start
 
-sectors_to_copy: db 128,0
+sectors_to_copy: dw 128
 sectors_per_track: db 9
+initial_ip: dw 0100h
+initial_sp: dw 0FFFEh
+initial_cs: dw DESTINATION_SEGMENT
+initial_ds: dw DESTINATION_SEGMENT
+initial_ss: dw DESTINATION_SEGMENT
 
 start:
 	; This boot code is at 0000:7c00 (512 bytes)
@@ -95,15 +98,25 @@ loading_done:
 	int 10h
 
 start_payload:
-	; Setup stack at end of destination 64K block
-	mov ax, DESTINATION_SEGMENT
-	mov ss, ax
-	mov ds, ax
-	mov es, ax
-	mov sp, 0FFFEh
 
-	; Go!
-	jmp DESTINATION_SEGMENT:0100h
+	; Setup stack
+	mov ax, [initial_ss]
+	mov ss, ax
+	mov sp, [initial_sp]
+
+	; Put far return address on stack
+	mov dx, [initial_cs]
+	push dx
+	mov dx, [initial_ip]
+	push dx
+
+	; Data segment
+	mov dx, [initial_ds]
+	mov ds, dx
+	mov es, ax ; Needed?
+
+final_jump:
+	retf
 
 progress:
 	push ax
@@ -133,13 +146,3 @@ section .marker start=0x7dFE
 	db 0x55, 0xaa
 
 section .data
-
-payload:
-	times 100h db 0x00
-	incbin "../dosgames/ratillry.com"
-	;incbin "/mnt/yggdrasil/games/pc/mspacman/MSPACMAN.COM"
-	;incbin "/mnt/yggdrasil/games/pc/pipes/pipes.com"
-payload_size: equ $-payload
-
-section .pading start=368639
-	db 0xff

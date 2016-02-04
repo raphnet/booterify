@@ -1,97 +1,254 @@
 #include <stdio.h>
 #include <string.h>
+#include <getopt.h>
+#include <stdint.h>
+#include "bootstrap.h"
 
-#define NUM_SECTORS	5
-#define SECTORS_PER_TRACK	6
+#define CODE_SEGMENT	0x1000
 
 unsigned char payload[0x10000];
 
+// EXE header fields
+#define SIG					0
+#define LAST_PAGE_SIZE		1
+#define FILE_PAGES			2
+#define RELOCATION_ITEMS	3
+#define HEADER_PARAGRAPHS	4
+#define MINALLOC			5
+#define MAXALLOC			6
+#define INITIAL_SS			7
+#define INITIAL_SP			8
+#define CHECKSUM			9
+#define INITIAL_IP			10
+#define PRE_RELOCATE_CS		11
+#define RELOCATION_TABLE_OFFSET	12
+#define OVERLAY_NUMBER		13
+
+
+static int read_uint16le(FILE *fptr, uint16_t *dst)
+{
+	unsigned char buf[2];
+
+	if (1 != fread(buf, 2, 1, fptr)) {
+		perror("fread");
+		return -1;
+	}
+
+	*dst = buf[0] | (buf[1]<<8);
+
+	return 0;
+}
+
+static void printHelp(void)
+{
+	printf("Usage: ./booterify [options] bootsector.bin executable output.dsk\n");
+	printf("\n");
+	printf("Where:\n");
+	printf(" - bootsector.bin is the bootloader,\n");
+	printf(" - executable is the input file (.exe or .com),\n");
+	printf(" - output.dsk is the output file.\n");
+	printf("\n");
+	printf("Options:\n");
+	printf(" -h             Prints help\n");
+	printf(" -c             Force input file format as .com (default: auto-detect)\n");
+	printf(" -e             Force input file format as .exe (default: auto-detect)\n");
+	printf(" -s             Sectors per track\n");
+	printf(" -t             Target disk size (padded with zeros). If 0, no padding.\n");
+}
+
 int main(int argc, char **argv)
 {
-	FILE *fptr_bootstrap, *fptr_payload, *fptr_disk;
-	unsigned char bootstrap_buf[513];
+	FILE *fptr_payload, *fptr_disk;
 	int bootstrap_size;
 	int payload_size;
-	unsigned short n_sectors;
+	unsigned short n_sectors, initial_ip = 0x100;
+	unsigned short initial_cs = CODE_SEGMENT;
+	unsigned short initial_ds = CODE_SEGMENT;
+	unsigned short initial_ss = CODE_SEGMENT;
+	unsigned short initial_sp = 0xFFFE;
 	unsigned char sectors_per_track = 9;
 	unsigned int disk_image_size = 360*1024;
+	int opt, i, retval = -1;
+	char *e;
+	const char *bootstrap_file, *executable_file, *output_file;
+	uint16_t exe_header[14];
+	char is_exe;
 
-	if (argc < 3) {
-		printf("Usage: ./booterify bootsector.bin file.com output.dsk\n");
-		return 0;
+	while (-1 != (opt = getopt(argc, argv, "hces:t:i:"))) {
+		switch(opt)
+		{
+			case 'h':
+				printHelp();
+				return 0;
+				break;
+			case '?':
+				fprintf(stderr, "Unknown option. Try -h\n");
+				return 1;
+				break;
+			case 's':
+				sectors_per_track = strtol(optarg, &e, 0);
+				if (e==optarg) {
+					fprintf(stderr, "Invalid value specified\n");
+					return 1;
+				}
+				break;
+
+			case 't':
+				disk_image_size = strtol(optarg, &e, 0);
+				if (e==optarg) {
+					fprintf(stderr, "Invalid value specified\n");
+					return 1;
+				}
+				break;
+		}
 	}
 
-	fptr_bootstrap = fopen(argv[1], "rb");
-	if (!fptr_bootstrap) {
-		perror("could not open bootstrap");
+	if (argc - optind < 3) {
+		fprintf(stderr, "Missing arguments\n");
+		return 1;
+	}
+
+	bootstrap_file = argv[optind];
+	executable_file = argv[optind+1];
+	output_file = argv[optind+2];
+
+	bootstrap_size = bootstrap_load(bootstrap_file);
+	if (bootstrap_size < 0) {
 		return -1;
 	}
 
-	fptr_payload = fopen(argv[2], "rb");
+	fptr_payload = fopen(executable_file, "rb");
 	if (!fptr_payload) {
 		perror("could not open payload");
-		fclose(fptr_bootstrap);
 		return -1;
 	}
 
-	memset(bootstrap_buf, 0, sizeof(bootstrap_buf));
-	bootstrap_size =  fread(bootstrap_buf, 1, 513, fptr_bootstrap);
-	if (bootstrap_size < 0) {
-		perror("fread");
-		goto err;
-	}
-	if (bootstrap_size > 512) {
-		fprintf(stderr, "Bootstrap too large");
-		goto err;
+	read_uint16le(fptr_payload, exe_header);
+	fseek(fptr_payload, 0, SEEK_SET);
+
+	if (exe_header[SIG] != 0x5a4d) {
+		is_exe = 0;
+	} else {
+		is_exe = 1;
 	}
 
+	printf("Bootstrap file: %s\n", bootstrap_file);
 	printf("Bootstrap size: %d\n", bootstrap_size);
+	printf("Payload file: %s\n", executable_file);
+	printf("Payload file type: %s\n", is_exe ? ".EXE" : ".COM");
+	printf("Output file: %s\n", output_file);
+	printf("Sectors per track: %d\n", sectors_per_track);
+	printf("Output file padding: %d B / %.2f kB / %.2f MB)\n", disk_image_size, disk_image_size / 1024.0, disk_image_size / 1024.0 / 1024.0);
 
-	payload_size =  fread(payload, 1, 0x10001, fptr_payload);
-	if (payload_size < 0) {
-		perror("fread");
-		goto err;
-	}
-	if (payload_size > 0x10000) {
-		fprintf(stderr, "Payload too large");
-		goto err;
+	if (is_exe) {
+		int file_size;
+
+		printf("Reading exe file...\n");
+		for (i=0; i<14; i++) {
+			if (read_uint16le(fptr_payload, &exe_header[i])) {
+				goto err;
+			}
+		}
+
+		file_size = exe_header[FILE_PAGES]*512;
+		if (exe_header[LAST_PAGE_SIZE]) {
+			file_size -= 512 - exe_header[LAST_PAGE_SIZE];
+		}
+		printf("File size: %d\n", file_size);
+
+		payload_size = file_size - exe_header[HEADER_PARAGRAPHS] * 16;
+
+		printf("Load module size: %d\n", payload_size);
+
+		if (payload_size > 0x10000) {
+			fprintf(stderr, "Payload too large");
+			goto err;
+		}
+
+		fseek(fptr_payload, exe_header[HEADER_PARAGRAPHS] * 16, SEEK_SET);
+		if (1 != fread(payload, payload_size, 1, fptr_payload)) {
+			perror("error reading exe loadmodule\n");
+			goto err;
+		}
+
+		initial_ip = exe_header[INITIAL_IP];
+		initial_sp = exe_header[INITIAL_SP];
+
+		printf("Relocating...\n");
+		initial_cs = exe_header[PRE_RELOCATE_CS] + CODE_SEGMENT;
+		initial_ss = exe_header[INITIAL_SS] + CODE_SEGMENT;
+
+		fseek(fptr_payload, exe_header[RELOCATION_TABLE_OFFSET], SEEK_SET);
+		for (i=0; i<exe_header[RELOCATION_ITEMS]; i++) {
+			uint16_t offset, segment;
+			uint32_t addr;
+			uint16_t val;
+			read_uint16le(fptr_payload, &offset);
+			read_uint16le(fptr_payload, &segment);
+			addr = segment * 16 + offset;
+			printf("Relocation %d : %04x:%04x (linear address 0x%08x) : ", i, segment, offset, addr);
+			if (addr >= 0x10000) {
+				fprintf(stderr, "Relocation out of bounds\n");
+				goto err;
+			}
+			val = payload[addr] + (payload[addr+1] << 8);
+			printf("0x%04x -> 0x%04x\n", val, val + CODE_SEGMENT);
+			val += CODE_SEGMENT;
+			payload[addr] = val & 0xff;
+			payload[addr+1] = val >> 8;
+		}
+
+	} else {
+		printf("Reading com file...\n");
+		payload_size =  fread(payload, 1, 0x10001, fptr_payload);
+		if (payload_size < 0) {
+			perror("fread");
+			goto err;
+		}
+		if (payload_size > 0x10000) {
+			fprintf(stderr, "Payload too large");
+			goto err;
+		}
 	}
 
 	printf("Payload size: %d\n", payload_size);
-
-	/** Configure the bootloader */
-	// 1 : Number of sectors to copy
-	if (payload_size < 512) {
-		n_sectors = 1;
-	} else {
-		n_sectors = payload_size / 512;
-	}
-	payload[NUM_SECTORS] = n_sectors & 0xff;
-	payload[NUM_SECTORS+1] = n_sectors >> 8;
-
-	// 2: Sectors per track
-	payload[SECTORS_PER_TRACK] = sectors_per_track;
-
+	printf("Code : 0x%04x:0x%04x\n", initial_cs, initial_ip);
+	printf("Stack : 0x%04x:0x%04x\n", initial_ss, initial_sp);
 
 	/** Write the file */
-	fptr_disk = fopen(argv[3], "wb");
+	fptr_disk = fopen(output_file, "wb");
 	if (!fptr_disk) {
 		perror("fopen");
 		goto err;
 	}
 
-	fwrite(bootstrap_buf, 512, 1, fptr_disk);
+	printf("Writing %s...\n", output_file);
+	// 1 : Number of sectors to copy
+	if (payload_size < 512) {
+		n_sectors = 1;
+	} else {
+		n_sectors = payload_size / 512 + 1;
+	}
+	printf("Bootstrap: %d sectors to copy, %d sectors per track, initial IP 0x%04x\n", n_sectors, sectors_per_track, initial_ip);
+	bootstrap_write(n_sectors, sectors_per_track,
+			initial_ip, initial_sp, initial_cs, initial_ds, initial_ss,
+			fptr_disk);
 	// our input is a .com file starting at 100H. On disk, we write 0x100 zeros.
-	fseek(fptr_disk, 0x100, SEEK_CUR);
+	if (!is_exe) {
+		fseek(fptr_disk, 0x100, SEEK_CUR);
+	}
 	fwrite(payload, payload_size, 1, fptr_disk);
-	fseek(fptr_disk, disk_image_size-1, SEEK_SET);
-	// Pad file size
-	bootstrap_buf[512] = 0;
-	fwrite(bootstrap_buf, 1, 1, fptr_disk);
+	if (disk_image_size > 512+payload_size) {
+		fseek(fptr_disk, disk_image_size-1, SEEK_SET);
+		// Pad file size
+		payload[0] = 0;
+		fwrite(payload, 1, 1, fptr_disk);
+	}
 
+	fclose(fptr_disk);
+	retval = 0;
 err:
-	fclose(fptr_bootstrap);
 	fclose(fptr_payload);
 
-	return 0;
+	return retval;
 }
