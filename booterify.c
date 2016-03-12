@@ -67,7 +67,7 @@ int main(int argc, char **argv)
 	unsigned short initial_ss = CODE_SEGMENT;
 	unsigned short initial_sp = 0xFFFE;
 	unsigned char sectors_per_track = 9;
-	unsigned int disk_image_size = 360*1024;
+	unsigned int disk_image_size = 0;
 	int opt, i, retval = -1;
 	char *e;
 	const char *bootstrap_file, *executable_file, *output_file;
