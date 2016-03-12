@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 	unsigned short initial_ss = CODE_SEGMENT;
 	unsigned short initial_sp = 0xFFFE;
 	unsigned char sectors_per_track = 9;
-	unsigned int disk_image_size = 360*1024;
+	unsigned int disk_image_size = 0;
 	int opt, i, retval = -1;
 	char *e;
 	const char *bootstrap_file, *executable_file, *output_file;
@@ -203,7 +203,12 @@ int main(int argc, char **argv)
 
 	} else {
 		printf("Reading com file...\n");
-		payload_size =  fread(payload, 1, 0x10001, fptr_payload);
+		// .com origin is at 0x100
+		// If there are command line options, we could place them
+		// somewhere here like DOS does....
+		memset(payload, 0, 0x100);
+		payload_size =  fread(payload + 0x100, 1, 0x10001-0x100, fptr_payload);
+		payload_size += 0x100;
 		if (payload_size < 0) {
 			perror("fread");
 			goto err;
@@ -236,10 +241,6 @@ int main(int argc, char **argv)
 	bootstrap_write(n_sectors, sectors_per_track,
 			initial_ip, initial_sp, initial_cs, initial_ds, initial_ss,
 			fptr_disk);
-	// our input is a .com file starting at 100H. On disk, we write 0x100 zeros.
-	if (!is_exe) {
-		fseek(fptr_disk, 0x100, SEEK_CUR);
-	}
 	fwrite(payload, payload_size, 1, fptr_disk);
 	if (disk_image_size > 512+payload_size) {
 		fseek(fptr_disk, disk_image_size-1, SEEK_SET);
