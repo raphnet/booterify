@@ -223,6 +223,15 @@ int main(int argc, char **argv)
 	printf("Code : 0x%04x:0x%04x\n", initial_cs, initial_ip);
 	printf("Stack : 0x%04x:0x%04x\n", initial_ss, initial_sp);
 
+
+	for (i=0; i<payload_size; i++) {
+		if (payload[i] == 0xCD) {
+			if (payload[i+1] == 0x21) {
+				printf("Potential DOS 21h interrupt call at 0x%04x\n", i);
+			}
+		}
+	}
+
 	/** Write the file */
 	fptr_disk = fopen(output_file, "wb");
 	if (!fptr_disk) {
