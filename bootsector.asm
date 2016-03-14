@@ -129,7 +129,6 @@ start_payload:
 	mov ax, [initial_cs]
 	sub ax, 0x10
 	mov es, ax
-	mov ds, ax
 	xor ax,ax
 
 final_jump:
