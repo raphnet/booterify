@@ -76,6 +76,7 @@ int main(int argc, char **argv)
 	const char *bootstrap_file, *executable_file, *output_file;
 	uint16_t exe_header[14];
 	char is_exe;
+	int dos_interrupts = 0;
 
 	while (-1 != (opt = getopt(argc, argv, "hces:t:i:"))) {
 		switch(opt)
@@ -186,6 +187,7 @@ int main(int argc, char **argv)
 			uint16_t offset, segment;
 			uint32_t addr;
 			uint16_t val;
+
 			read_uint16le(fptr_payload, &offset);
 			read_uint16le(fptr_payload, &segment);
 			addr = segment * 16 + offset;
@@ -200,6 +202,11 @@ int main(int argc, char **argv)
 			payload[addr] = val & 0xff;
 			payload[addr+1] = val >> 8;
 		}
+
+		// bootsector.asm always points ES to 0x100 bytes before load image.
+		// But DS will be equal to CS for .COM executables, but for .EXEs, it
+		// must equals ES.
+		initial_ds = CODE_SEGMENT - 0x10;
 
 	} else {
 		printf("Reading com file...\n");
@@ -224,10 +231,13 @@ int main(int argc, char **argv)
 	printf("Stack : 0x%04x:0x%04x\n", initial_ss, initial_sp);
 
 
-	for (i=0; i<payload_size; i++) {
-		if (payload[i] == 0xCD) {
-			if (payload[i+1] == 0x21) {
-				printf("Potential DOS 21h interrupt call at 0x%04x\n", i);
+	for (i=0; i<payload_size-1; i++) {
+			if (payload[i] == 0xCD) {
+			unsigned char intno = payload[i+1];
+
+			if ((intno >= 0x20 && intno <= 0x29) || intno == 0x2E || intno == 0x2F) {
+				printf("Warning: Potential DOS %02xh interrupt call at 0x%04x\n", intno, i);
+				dos_interrupts = 1;
 			}
 		}
 	}
@@ -262,6 +272,18 @@ int main(int argc, char **argv)
 	retval = 0;
 err:
 	fclose(fptr_payload);
+
+	if (dos_interrupts) {
+		printf("* * * * * * *\n");
+		printf("Warning: Byte sequences looking like DOS interrupt calls (eg: CD 21   int 21h ) were found!\n");
+		printf("\n");
+		printf("This may be a coincidence as code and data are undistinguishable without more analysis. If "
+				"your software does not boot, you should disassemble your executable and investigate.\n"
+				"See above for int number(s) and address(es).\n");
+		printf("\n");
+		printf("Note that int 21h (ah=25h and ah=35h) are supported by bootsector.asm.\n");
+		printf("* * * * * * *\n");
+	}
 
 	return retval;
 }
