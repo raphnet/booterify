@@ -3,6 +3,8 @@ bits 16
 cpu 8086
 [map symbols bootsector.map]
 
+%define INT21H_HELPERS
+
 %define DESTINATION_SEGMENT	1000H
 %define FIRST_SECTOR		2
 %define FIRST_TRACK			0
@@ -26,8 +28,16 @@ start:
 	; Setup stack pointer at the end of our 512 byte space
 	mov ax, 0
 	mov ds, ax
-;	mov ss, ax
-;	mov sp, 07CFEh
+	mov ss, ax
+	mov sp, 1FFh
+
+%ifdef INT21H_HELPERS
+	; Install our handler at 0000:0084
+	mov ax, int21
+	mov word [21h * 4], ax
+	mov ax, 0
+	mov word [21h * 4 + 2], ax
+%endif
 
 	; Trace
 	mov ah, 00Eh
@@ -65,7 +75,9 @@ _same_track:
 	mov al, [sectors_to_copy]
 _complete_track:
 	mov ah, 02h
-	int 13h
+	push ax ; Keep AL around. Not all BIOSes preserve it.
+		int 13h
+	pop ax
 	jc error
 
 	push ax
@@ -113,7 +125,12 @@ start_payload:
 	; Data segment
 	mov dx, [initial_ds]
 	mov ds, dx
-	mov es, ax ; Needed?
+
+	mov ax, [initial_cs]
+	sub ax, 0x10
+	mov es, ax
+	mov ds, ax
+	xor ax,ax
 
 final_jump:
 	retf
@@ -141,6 +158,71 @@ error:
 
 hang:
 	jmp hang
+
+%ifdef INT21H_HELPERS
+int21:
+	cmp ah, 25h
+	je int21_25
+	cmp ah, 35h
+	je int21_35
+	iret
+
+	; AH: 25h
+	; AL: interrupt number
+	; DS:DX -> new interrupt handler
+int21_25:
+	push ax
+	push es
+	push di
+
+	xor ah,ah
+	shl ax, 1
+	shl ax, 1
+	mov di, ax
+
+	mov ax, 0
+	mov es, ax
+
+	cld
+	mov ax, dx
+	stosw ; offset
+	mov ax, ds
+	stosw ; segment
+
+	pop di
+	pop es
+	pop ax
+	iret
+
+	; AH : 35h
+	; AL : Interrupt number
+	;
+	; Return
+	; ES:BX -> current interrupt handler
+int21_35:
+	push ax
+	push ds
+	push si
+
+	xor ah,ah
+	shl ax, 1
+	shl ax, 1
+	mov si, ax
+
+	mov ax, 0
+	mov ds, ax
+
+	cld
+	lodsw ; offset
+	mov bx, ax
+	lodsw ; segment
+	mov es, ax
+
+	pop si
+	pop ds
+	pop ax
+	iret
+%endif
 
 section .marker start=0x7dFE
 	db 0x55, 0xaa
