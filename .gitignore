@@ -1,1 +1,6 @@
+booterify
+exeinfo
 bootsector.map
+*.o
+*.dsk
+*.bin
