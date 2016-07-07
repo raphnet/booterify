@@ -15,4 +15,4 @@ exeinfo: exeinfo.o
 	$(LD) $(LDFLAGS) $^ -o $@
 
 clean:
-	rm -f bootsector.bin *.o
+	rm -f bootsector.bin *.o booterify exeinfo
