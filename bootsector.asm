@@ -25,11 +25,12 @@ start:
 	;
 	cli
 
-	; Setup stack pointer at the end of our 512 byte space
 	mov ax, 0
 	mov ds, ax
+
+	; Setup stack
 	mov ss, ax
-	mov sp, 1FFh
+	mov sp, 7C00h
 
 %ifdef INT21H_HELPERS
 	; Install our handler at 0000:0084
