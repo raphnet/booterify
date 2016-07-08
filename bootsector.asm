@@ -165,6 +165,29 @@ int21:
 	je int21_25
 	cmp ah, 35h
 	je int21_35
+	cmp ah, 09h
+	je int21_09
+	iret
+
+	; AH : 09
+	; DX : $tring
+int21_09:
+	push ax
+	push bx
+		mov bx, dx
+		mov ah, 0Eh
+_int21_09_lp:
+		mov al, [bx]
+		push bx
+			mov bx, 0x0001
+			int 10h
+		pop bx
+
+		inc bx
+		cmp byte [bx], '$'
+		jne _int21_09_lp
+	pop bx
+	pop ax
 	iret
 
 	; AH: 25h
