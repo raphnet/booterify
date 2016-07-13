@@ -281,7 +281,7 @@ err:
 				"your software does not boot, you should disassemble your executable and investigate.\n"
 				"See above for int number(s) and address(es).\n");
 		printf("\n");
-		printf("Note that int 21h (ah=25h and ah=35h) are supported by bootsector.asm.\n");
+		printf("Note that int 21h (ah=09h, ah=25h and ah=35h) are supported by bootsector.asm.\n");
 		printf("* * * * * * *\n");
 	}
 
