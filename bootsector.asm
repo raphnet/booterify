@@ -9,11 +9,38 @@ cpu 8086
 %define FIRST_SECTOR		2
 %define FIRST_TRACK			0
 
+section .text
+
 init:
-	jmp 0000:start
+	jmp short start
+	nop
+	db 'raphnet '	; OEM identifier
+	dw 512	; Bytes per logical sector
+	db 1	; Logical sectors per cluster
+	dw 129	; Reserved logical sectors
+	db 2	; Number of FATs
+	dw 224	; Root directory entries
+	dw 2880	; Total logical sectors
+media_descriptor:	db 0xF0 ; Media descriptor
+	dw 0	; Logical sectors per fat
+sectors_per_track: db 9
+	db 0
+num_heads:
+	dw 2	; Number of heads
+	dd 0 	; Hiden sectors
+	dd 0	; Large number of sectors
+
+	db 0	; Drive number
+	db 0	; Winnt flags
+signature:	db 0x28	; Signature
+	db '0000' ; Volume ID/Serial
+	db '           ' ; Label
+	db 'FAT12   '	; System identifier string
+
+nop
+nop
 
 sectors_to_copy: dw 128
-sectors_per_track: db 9
 initial_ip: dw 0100h
 initial_sp: dw 0FFFEh
 initial_cs: dw DESTINATION_SEGMENT
@@ -21,10 +48,13 @@ initial_ds: dw DESTINATION_SEGMENT
 initial_ss: dw DESTINATION_SEGMENT
 
 start:
+	jmp 0000:start2
+start2:
 	; This boot code is at 0000:7c00 (512 bytes)
 	;
 	cli
 
+	; Setup data segment to 0000
 	mov ax, 0
 	mov ds, ax
 
@@ -49,11 +79,12 @@ start:
 	int 10h
 
 	; ES:BX is the destination
-	mov ax, DESTINATION_SEGMENT
+	mov ax, [initial_cs] ; DESTINATION_SEGMENT
 	mov es, ax
 	mov bx, 0h
 
 	; Setup registers for the loop
+	; DL is never touched. Should still hold boot drive number
 	mov ch, FIRST_TRACK
 	mov dh, 0 ; Side
 	mov cl, FIRST_SECTOR ; the first read start after the loader
@@ -72,7 +103,7 @@ _same_track:
 	mov al, [sectors_per_track]
 	cmp word [sectors_to_copy], ax
 	pop ax
-	jg _complete_track ; al stays untouched
+	jge _complete_track ; al stays untouched
 	mov al, [sectors_to_copy]
 _complete_track:
 	mov ah, 02h
@@ -81,7 +112,6 @@ _complete_track:
 	pop ax
 	jc error
 
-	push ax
 	push cx
 		; AL equals the number of sectors that were just read
 		xor ah,ah
@@ -92,11 +122,10 @@ _complete_track:
 		shl ax, cl
 		add bx, ax
 	pop cx
-	pop ax
 
 	; Prepare values for the next phase.
+	mov al, [sectors_per_track]
 	mov cl, 1 ; all reads now start at track 1
-	mov al, [sectors_per_track] ; read complete tracks
 
 	test word [sectors_to_copy], 0xffff
 	jnz copy_loop
@@ -123,14 +152,15 @@ start_payload:
 	mov dx, [initial_ip]
 	push dx
 
-	; Data segment
-	mov dx, [initial_ds]
-	mov ds, dx
-
 	mov ax, [initial_cs]
 	sub ax, 0x10
 	mov es, ax
 	xor ax,ax
+
+	; Data segment
+	mov dx, [initial_ds]
+	mov ds, dx
+
 
 final_jump:
 	retf

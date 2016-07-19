@@ -3,13 +3,13 @@
 #include "bootstrap.h"
 
 // This must match bootsector.map
-#define NUM_SECTORS			0x05
-#define SECTORS_PER_TRACK	0x07
-#define INITIAL_IP			0x08
-#define INITIAL_SP			0x0A
-#define INITIAL_CS			0x0C
-#define INITIAL_DS			0x0E
-#define INITIAL_SS			0x10
+#define NUM_SECTORS			0x40
+#define SECTORS_PER_TRACK	0x18
+#define INITIAL_IP			0x42
+#define INITIAL_SP			0x44
+#define INITIAL_CS			0x46
+#define INITIAL_DS			0x48
+#define INITIAL_SS			0x4A
 
 static unsigned char bootstrap_buf[513];
 

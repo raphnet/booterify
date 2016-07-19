@@ -68,7 +68,7 @@ int main(int argc, char **argv)
 	unsigned short initial_cs = CODE_SEGMENT;
 	unsigned short initial_ds = CODE_SEGMENT;
 	unsigned short initial_ss = CODE_SEGMENT;
-	unsigned short initial_sp = 0xFFFE;
+	unsigned short initial_sp = 0xFFFF;
 	unsigned char sectors_per_track = 9;
 	unsigned int disk_image_size = 0;
 	int opt, i, retval = -1;
@@ -256,7 +256,11 @@ int main(int argc, char **argv)
 	} else {
 		n_sectors = payload_size / 512 + 1;
 	}
-	printf("Bootstrap: %d sectors to copy, %d sectors per track, initial IP 0x%04x\n", n_sectors, sectors_per_track, initial_ip);
+	printf("Bootstrap: %d sectors to copy, %d sectors per track\n\tinitial IP 0x%04x\n", n_sectors, sectors_per_track, initial_ip);
+	printf("\tinitial SP 0x%04x\n", initial_sp);
+	printf("\tinitial CS 0x%04x\n", initial_cs);
+	printf("\tinitial DS 0x%04x\n", initial_ds);
+	printf("\tinitial SS 0x%04x\n", initial_ss);
 	bootstrap_write(n_sectors, sectors_per_track,
 			initial_ip, initial_sp, initial_cs, initial_ds, initial_ss,
 			fptr_disk);
