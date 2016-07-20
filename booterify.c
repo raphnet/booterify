@@ -58,6 +58,10 @@ static void printHelp(void)
 	printf("Common disk parameters:\n");
 	printf("  360k floppy:  -s 9 -t 368640\n");
 	printf("  1.44MB floppy:  -s 18 -t 1474560\n");
+	printf("\n");
+	printf("Note: Padding with -t as above is not required when writing to\n");
+	printf("      a physical floppy, but it can help for emulators or virtual\n");
+	printf("      machines that use the file size to determine the floppy type.\n");
 }
 
 int main(int argc, char **argv)
