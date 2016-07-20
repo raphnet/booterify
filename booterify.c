@@ -56,7 +56,8 @@ static void printHelp(void)
 	printf(" -t             Target disk size (padded with zeros). If 0, no padding.\n");
 	printf("\n");
 	printf("Common disk parameters:\n");
-	printf(" For 360k floppy:  -s 9 -t 368640\n");
+	printf("  360k floppy:  -s 9 -t 368640\n");
+	printf("  1.44MB floppy:  -s 18 -t 1474560\n");
 }
 
 int main(int argc, char **argv)
