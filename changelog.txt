@@ -1,2 +1,7 @@
+Version 1.1
+ - Add a bios parameter block (To make bootable USB sticks)
+ - Add int 21h,09 (DOS print string)
+ - Larger bootloader stack
+
 Version 1.0
  - Initial release
