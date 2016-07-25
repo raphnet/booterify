@@ -24,6 +24,21 @@ unsigned char payload[0x10000];
 #define RELOCATION_TABLE_OFFSET	12
 #define OVERLAY_NUMBER		13
 
+void hexdump(const unsigned char *data, int len, int address)
+{
+	int i;
+
+	for (i=0; i<len; i++) {
+		if (!(i%8)) {
+			if (i)
+				printf("\n");
+			printf("\t%04x : ", address + i);
+		}
+		printf("%02x ", *data);
+		data++;
+	}
+	printf("\n");
+}
 
 static int read_uint16le(FILE *fptr, uint16_t *dst)
 {
@@ -242,6 +257,7 @@ int main(int argc, char **argv)
 
 			if ((intno >= 0x20 && intno <= 0x29) || intno == 0x2E || intno == 0x2F) {
 				printf("Warning: Potential DOS %02xh interrupt call at 0x%04x\n", intno, i);
+				hexdump(&payload[i>16 ? (i-16) :0], 32, i>16 ? (i-16):0);
 				dos_interrupts = 1;
 			}
 		}
