@@ -1,3 +1,7 @@
+Version 1.2
+ - Add a hexdump when a potential DOS interrupt call is found
+ - Fix incorrect use of load address in some cases
+
 Version 1.1
  - Add a bios parameter block (To make bootable USB sticks)
  - Add int 21h,09 (DOS print string)
