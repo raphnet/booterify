@@ -41,6 +41,7 @@ nop
 nop
 
 sectors_to_copy: dw 128
+destination_segment: dw DESTINATION_SEGMENT
 initial_ip: dw 0100h
 initial_sp: dw 0FFFEh
 initial_cs: dw DESTINATION_SEGMENT
@@ -79,7 +80,7 @@ start2:
 	int 10h
 
 	; ES:BX is the destination
-	mov ax, [initial_cs] ; DESTINATION_SEGMENT
+	mov ax, [destination_segment]
 	mov es, ax
 	mov bx, 0h
 

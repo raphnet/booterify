@@ -3,6 +3,7 @@
 
 int bootstrap_load(const char *filename);
 int bootstrap_write(unsigned short num_sectors_to_copy, unsigned char sectors_per_track,
+			unsigned short dst_segment,
 			unsigned short initial_ip,
 			unsigned short initial_sp,
 			unsigned short initial_cs,

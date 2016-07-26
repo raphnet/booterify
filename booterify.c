@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include "bootstrap.h"
 
-#define CODE_SEGMENT	0x1000
+#define DESTINATION_SEGMENT	0x1000
 
 unsigned char payload[0x10000];
 
@@ -70,9 +70,9 @@ int main(int argc, char **argv)
 	int bootstrap_size;
 	int payload_size;
 	unsigned short n_sectors, initial_ip = 0x100;
-	unsigned short initial_cs = CODE_SEGMENT;
-	unsigned short initial_ds = CODE_SEGMENT;
-	unsigned short initial_ss = CODE_SEGMENT;
+	unsigned short initial_cs = DESTINATION_SEGMENT;
+	unsigned short initial_ds = DESTINATION_SEGMENT;
+	unsigned short initial_ss = DESTINATION_SEGMENT;
 	unsigned short initial_sp = 0xFFFF;
 	unsigned char sectors_per_track = 9;
 	unsigned int disk_image_size = 0;
@@ -184,8 +184,8 @@ int main(int argc, char **argv)
 		initial_sp = exe_header[INITIAL_SP];
 
 		printf("Relocating...\n");
-		initial_cs = exe_header[PRE_RELOCATE_CS] + CODE_SEGMENT;
-		initial_ss = exe_header[INITIAL_SS] + CODE_SEGMENT;
+		initial_cs = exe_header[PRE_RELOCATE_CS] + DESTINATION_SEGMENT;
+		initial_ss = exe_header[INITIAL_SS] + DESTINATION_SEGMENT;
 
 		fseek(fptr_payload, exe_header[RELOCATION_TABLE_OFFSET], SEEK_SET);
 		for (i=0; i<exe_header[RELOCATION_ITEMS]; i++) {
@@ -202,8 +202,8 @@ int main(int argc, char **argv)
 				goto err;
 			}
 			val = payload[addr] + (payload[addr+1] << 8);
-			printf("0x%04x -> 0x%04x\n", val, val + CODE_SEGMENT);
-			val += CODE_SEGMENT;
+			printf("0x%04x -> 0x%04x\n", val, val + DESTINATION_SEGMENT);
+			val += DESTINATION_SEGMENT;
 			payload[addr] = val & 0xff;
 			payload[addr+1] = val >> 8;
 		}
@@ -211,7 +211,7 @@ int main(int argc, char **argv)
 		// bootsector.asm always points ES to 0x100 bytes before load image.
 		// But DS will be equal to CS for .COM executables, but for .EXEs, it
 		// must equals ES.
-		initial_ds = CODE_SEGMENT - 0x10;
+		initial_ds = DESTINATION_SEGMENT - 0x10;
 
 	} else {
 		printf("Reading com file...\n");
@@ -262,11 +262,12 @@ int main(int argc, char **argv)
 		n_sectors = payload_size / 512 + 1;
 	}
 	printf("Bootstrap: %d sectors to copy, %d sectors per track\n\tinitial IP 0x%04x\n", n_sectors, sectors_per_track, initial_ip);
+	printf("\tdestination segment 0x%04x\n", DESTINATION_SEGMENT);
 	printf("\tinitial SP 0x%04x\n", initial_sp);
 	printf("\tinitial CS 0x%04x\n", initial_cs);
 	printf("\tinitial DS 0x%04x\n", initial_ds);
 	printf("\tinitial SS 0x%04x\n", initial_ss);
-	bootstrap_write(n_sectors, sectors_per_track,
+	bootstrap_write(n_sectors, sectors_per_track, DESTINATION_SEGMENT,
 			initial_ip, initial_sp, initial_cs, initial_ds, initial_ss,
 			fptr_disk);
 	fwrite(payload, payload_size, 1, fptr_disk);

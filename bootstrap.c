@@ -5,15 +5,17 @@
 // This must match bootsector.map
 #define NUM_SECTORS			0x40
 #define SECTORS_PER_TRACK	0x18
-#define INITIAL_IP			0x42
-#define INITIAL_SP			0x44
-#define INITIAL_CS			0x46
-#define INITIAL_DS			0x48
-#define INITIAL_SS			0x4A
+#define DST_SEGMENT			0x42
+#define INITIAL_IP			0x44
+#define INITIAL_SP			0x46
+#define INITIAL_CS			0x48
+#define INITIAL_DS			0x4A
+#define INITIAL_SS			0x4C
 
 static unsigned char bootstrap_buf[513];
 
 int bootstrap_write(unsigned short num_sectors_to_copy, unsigned char sectors_per_track,
+			unsigned short dst_segment,
 			unsigned short initial_ip,
 			unsigned short initial_sp,
 			unsigned short initial_cs,
