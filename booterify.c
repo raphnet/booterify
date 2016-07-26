@@ -70,6 +70,10 @@ static void printHelp(void)
 	printf(" -s             Sectors per track\n");
 	printf(" -t             Target disk size (padded with zeros). If 0, no padding.\n");
 	printf("\n");
+	printf("Debugging/Development:\n");
+	printf(" -B file        Generate list of breakpoints commands for bochs for all\n");
+	printf("                instances of DOS int calls\n");
+	printf("\n");
 	printf("Common disk parameters:\n");
 	printf("  360k floppy:  -s 9 -t 368640\n");
 	printf("  1.44MB floppy:  -s 18 -t 1474560\n");
@@ -97,8 +101,9 @@ int main(int argc, char **argv)
 	uint16_t exe_header[14];
 	char is_exe;
 	int dos_interrupts = 0;
+	FILE *breakpoints_ints_fptr = NULL;
 
-	while (-1 != (opt = getopt(argc, argv, "hces:t:i:"))) {
+	while (-1 != (opt = getopt(argc, argv, "hces:t:i:B:"))) {
 		switch(opt)
 		{
 			case 'h':
@@ -121,6 +126,14 @@ int main(int argc, char **argv)
 				disk_image_size = strtol(optarg, &e, 0);
 				if (e==optarg) {
 					fprintf(stderr, "Invalid value specified\n");
+					return 1;
+				}
+				break;
+
+			case 'B':
+				breakpoints_ints_fptr = fopen(optarg, "w");
+				if (!breakpoints_ints_fptr) {
+					perror("fopen breakpoint file");
 					return 1;
 				}
 				break;
@@ -257,8 +270,12 @@ int main(int argc, char **argv)
 
 			if ((intno >= 0x20 && intno <= 0x29) || intno == 0x2E || intno == 0x2F) {
 				printf("Warning: Potential DOS %02xh interrupt call at 0x%04x\n", intno, i);
-				hexdump(&payload[i>16 ? (i-16) :0], 32, i>16 ? (i-16):0);
+				hexdump(&payload[i>16 ? (i-16) :0], 24, i>16 ? (i-16):0);
 				dos_interrupts = 1;
+
+				if (breakpoints_ints_fptr) {
+					fprintf(breakpoints_ints_fptr, "vbreak 0x%04x:0x%04x\n", DESTINATION_SEGMENT, i);
+				}
 			}
 		}
 	}
@@ -309,6 +326,10 @@ err:
 		printf("\n");
 		printf("Note that int 21h (ah=09h, ah=25h and ah=35h) are supported by bootsector.asm.\n");
 		printf("* * * * * * *\n");
+	}
+
+	if (breakpoints_ints_fptr) {
+		fclose(breakpoints_ints_fptr);
 	}
 
 	return retval;
