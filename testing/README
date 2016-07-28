@@ -1,0 +1,7 @@
+1) Drop your .EXE and .COM files in executables/
+2) From the project root, run generatetests.sh
+3) Run the disks images found in disks/ in bochs (or any appropriate emulator or hardware)
+
+Optional
+
+4) If it fails, have a look to the logs in logs/ to find out why.
