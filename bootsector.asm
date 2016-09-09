@@ -53,7 +53,7 @@ start:
 start2:
 	; This boot code is at 0000:7c00 (512 bytes)
 	;
-	cli
+	;cli
 
 	; Setup data segment to 0000
 	mov ax, 0
