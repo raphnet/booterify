@@ -14,28 +14,40 @@ section .text
 init:
 	jmp short start
 	nop
-	db 'raphnet '	; OEM identifier
+banner:
+	db 'MSWIN4.1'	; OEM identifier
+	;db 'raphnet '	; OEM identifier
+bytes_per_sector:
 	dw 512	; Bytes per logical sector
+sectors_per_cluster:
 	db 1	; Logical sectors per cluster
-	dw 129	; Reserved logical sectors
-	db 2	; Number of FATs
+reserved_sectors:
+	dw 129	; Reserved logical sectors (Boot sector + our 64K payload)
+n_fats:
+	db 1	; Number of FATs
+root_directory_entries:
 	dw 224	; Root directory entries
+total_logical_sectors:
 	dw 2880	; Total logical sectors
-media_descriptor:	db 0xF0 ; Media descriptor
-	dw 0	; Logical sectors per fat
-sectors_per_track: db 9
-	db 0
+media_descriptor:
+	db 0xF0 ; Media descriptor
+logical_sectors_per_fat:
+	dw 9	; Logical sectors per fat
+sectors_per_track:
+	dw 9
 num_heads:
 	dw 2	; Number of heads
+num_hidden_sectors:
 	dd 0 	; Hiden sectors
+large_number_of_sectors:
 	dd 0	; Large number of sectors
-
+drive_number:
 	db 0	; Drive number
 	db 0	; Winnt flags
-signature:	db 0x28	; Signature
-	db '0000' ; Volume ID/Serial
-	db '           ' ; Label
-	db 'FAT12   '	; System identifier string
+signature:	db 0x29	; Signature
+volume_id:	db '0123' ; Volume ID/Serial
+volume_label:	db '           ' ; Label
+fstype:			db 'FAT12   '	; System identifier string
 
 nop
 nop
