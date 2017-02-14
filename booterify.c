@@ -246,7 +246,10 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	getBPB_for_size(disk_size, &bpb);
+	if (getBPB_for_size(disk_size, &bpb)) {
+		fprintf(stderr, "Invalid disk size\n");
+		return -1;
+	}
 
 	bootstrap_file = argv[optind];
 	executable_file = argv[optind+1];
