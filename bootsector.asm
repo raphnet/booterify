@@ -6,8 +6,13 @@ cpu 8086
 %define INT21H_HELPERS
 
 %define DESTINATION_SEGMENT	1000H
-%define FIRST_SECTOR		2
-%define FIRST_TRACK			0
+;%define FIRST_SECTOR		2
+;%define FIRST_TRACK			0
+
+; Payload start must be at the first
+; sector of track 1
+%define FIRST_SECTOR		1
+%define FIRST_TRACK			1
 
 section .text
 
@@ -102,7 +107,7 @@ start2:
 	mov dh, 0 ; Side
 	mov cl, FIRST_SECTOR ; the first read start after the loader
 	mov al, [sectors_per_track]
-	sub al, 1 ; Loader sector skipped
+	sub al, FIRST_SECTOR-1 ; Loader sector skipped
 	jmp _same_track
 
 copy_loop:
@@ -138,7 +143,7 @@ _complete_track:
 
 	; Prepare values for the next phase.
 	mov al, [sectors_per_track]
-	mov cl, 1 ; all reads now start at track 1
+	mov cl, 1 ; all reads now start at sector 1
 
 	test word [sectors_to_copy], 0xffff
 	jnz copy_loop

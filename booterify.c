@@ -6,6 +6,8 @@
 
 #define DESTINATION_SEGMENT	0x1000
 
+#define DEFAULT_DISK_LABEL	"Booterify"
+
 unsigned char payload[0x10000];
 
 // EXE header fields
@@ -65,22 +67,127 @@ static void printHelp(void)
 	printf("\n");
 	printf("Options:\n");
 	printf(" -h             Prints help\n");
-	printf(" -c             Force input file format as .com (default: auto-detect)\n");
-	printf(" -e             Force input file format as .exe (default: auto-detect)\n");
-	printf(" -s             Sectors per track\n");
-	printf(" -t             Target disk size (padded with zeros). If 0, no padding.\n");
+	//printf(" -c             Force input file format as .com (default: auto-detect)\n");
+	//printf(" -e             Force input file format as .exe (default: auto-detect)\n");
+	printf(" -f size        Floppy format. Supports 360, 720, 1200 and 1440 sizes.\n");
+	printf(" -l label       Set floppy label. (Default: '%s')\n", DEFAULT_DISK_LABEL);
 	printf("\n");
 	printf("Debugging/Development:\n");
 	printf(" -B file        Generate list of breakpoints commands for bochs for all\n");
 	printf("                instances of DOS int calls\n");
-	printf("\n");
-	printf("Common disk parameters:\n");
-	printf("  360k floppy:  -s 9 -t 368640\n");
-	printf("  1.44MB floppy:  -s 18 -t 1474560\n");
-	printf("\n");
-	printf("Note: Padding with -t as above is not required when writing to\n");
-	printf("      a physical floppy, but it can help for emulators or virtual\n");
-	printf("      machines that use the file size to determine the floppy type.\n");
+}
+
+int getBPB_for_size(int f, struct bootstrap_bpb *bpb)
+{
+	struct bootstrap_bpb f360k_bpb = {
+		.bytes_per_logical_sector = 512,
+		.sectors_per_cluster = 2,
+		.reserved_logical_sectors = 1,
+		.n_fats = 2,
+		.root_dir_entries = 112,
+		.total_logical_sectors = 9 * 2 * 40, // sectors * heads * tracks
+		.media_descriptor = 0xFD, // 360K
+		.logical_sectors_per_fat = 2, // FAT occupies two sectors
+		.sectors_per_track = 9,
+		.num_heads = 2,
+
+		.disk_image_size = 360 * 1024,
+	};
+	struct bootstrap_bpb f720k_bpb = {
+		.bytes_per_logical_sector = 512,
+		.sectors_per_cluster = 2,
+		.reserved_logical_sectors = 1,
+		.n_fats = 2,
+		.root_dir_entries = 112,
+		.total_logical_sectors = 9 * 2 * 80,
+		.media_descriptor = 0xF9,
+		.logical_sectors_per_fat = 3,
+		.sectors_per_track = 9,
+		.num_heads = 2,
+
+		.disk_image_size = 720 * 1024,
+	};
+	struct bootstrap_bpb f1200k_bpb = {
+		.bytes_per_logical_sector = 512,
+		.sectors_per_cluster = 1,
+		.reserved_logical_sectors = 1,
+		.n_fats = 2,
+		.root_dir_entries = 224,
+		.total_logical_sectors = 15 * 2 * 80,
+		.media_descriptor = 0xF9,
+		.logical_sectors_per_fat = 7,
+		.sectors_per_track = 15,
+		.num_heads = 2,
+
+		.disk_image_size = 1200 * 1024,
+	};
+	struct bootstrap_bpb f1440k_bpb = {
+		.bytes_per_logical_sector = 512,
+		.sectors_per_cluster = 1,
+		.reserved_logical_sectors = 1,
+		.n_fats = 2,
+		.root_dir_entries = 224,
+		.total_logical_sectors = 18 * 2 * 80, // sectors * heads * tracks
+		.media_descriptor = 0xF0,
+		.logical_sectors_per_fat = 9,
+		.sectors_per_track = 18,
+		.num_heads = 2,
+
+		.disk_image_size = 1440 * 1024,
+	};
+
+
+
+	switch(f)
+	{
+		case 360: memcpy(bpb, &f360k_bpb, sizeof(struct bootstrap_bpb)); return 0;
+		case 720: memcpy(bpb, &f720k_bpb, sizeof(struct bootstrap_bpb)); return 0;
+		case 1200: memcpy(bpb, &f1200k_bpb, sizeof(struct bootstrap_bpb)); return 0;
+		case 1440: memcpy(bpb, &f1440k_bpb, sizeof(struct bootstrap_bpb)); return 0;
+	}
+
+	return -1;
+}
+
+int writeVolumeLabel(FILE *outfptr, const char *name, uint8_t attr, uint16_t mod_time,
+						uint16_t mod_date, uint16_t start_cluster, uint32_t file_size)
+{
+	uint8_t directory_entry[32];
+	int namelength;
+
+	memset(directory_entry, 0, sizeof(directory_entry));
+	memset(directory_entry, ' ', 11);
+	memcpy(directory_entry, name, 11);
+	namelength = strlen(name);
+	if (namelength > 11) {
+		fprintf(stderr, "Volume label is too long\n");
+		return -1;
+	}
+	memcpy(directory_entry, name, namelength);
+
+	directory_entry[0x0B] = attr;
+	directory_entry[0x16] = mod_time;
+	directory_entry[0x17] = mod_time >> 8;
+	directory_entry[0x18] = mod_date;
+	directory_entry[0x19] = mod_date >> 8;
+	directory_entry[0x1A] = start_cluster;
+	directory_entry[0x1B] = start_cluster >> 8;
+	directory_entry[0x1C] = file_size;
+	directory_entry[0x1D] = file_size >> 8;
+	directory_entry[0x1E] = file_size >> 16;
+	directory_entry[0x1F] = file_size >> 24;
+
+	fwrite(directory_entry, sizeof(directory_entry), 1, outfptr);
+	return 0;
+}
+
+int writeDirectoryEntry(FILE *outfptr, const char *filename, const char *extension,
+						uint8_t attr, uint16_t mod_time, uint16_t mod_date,
+						uint16_t start_cluster, uint32_t file_size)
+{
+	char tmp[12];
+	snprintf(tmp, 12, "%-8s%-3s", filename, extension);
+	return writeVolumeLabel(outfptr, tmp, attr, mod_time, mod_date, start_cluster, file_size);
 }
 
 int main(int argc, char **argv)
@@ -94,7 +201,6 @@ int main(int argc, char **argv)
 	unsigned short initial_ss = DESTINATION_SEGMENT;
 	unsigned short initial_sp = 0xFFFF;
 	unsigned char sectors_per_track = 9;
-	unsigned int disk_image_size = 0;
 	int opt, i, retval = -1;
 	char *e;
 	const char *bootstrap_file, *executable_file, *output_file;
@@ -102,8 +208,13 @@ int main(int argc, char **argv)
 	char is_exe;
 	int dos_interrupts = 0;
 	FILE *breakpoints_ints_fptr = NULL;
+	struct bootstrap_bpb bpb;
+	int first_cluster_sector = 512;
+	int disk_size = 1440;
+	const char *disk_label = DEFAULT_DISK_LABEL;
 
-	while (-1 != (opt = getopt(argc, argv, "hces:t:i:B:"))) {
+
+	while (-1 != (opt = getopt(argc, argv, "hB:f:l:"))) {
 		switch(opt)
 		{
 			case 'h':
@@ -114,22 +225,12 @@ int main(int argc, char **argv)
 				fprintf(stderr, "Unknown option. Try -h\n");
 				return 1;
 				break;
-			case 's':
-				sectors_per_track = strtol(optarg, &e, 0);
-				if (e==optarg) {
-					fprintf(stderr, "Invalid value specified\n");
-					return 1;
-				}
+			case 'f':
+				disk_size = atoi(optarg);
 				break;
-
-			case 't':
-				disk_image_size = strtol(optarg, &e, 0);
-				if (e==optarg) {
-					fprintf(stderr, "Invalid value specified\n");
-					return 1;
-				}
+			case 'l':
+				disk_label = optarg;
 				break;
-
 			case 'B':
 				breakpoints_ints_fptr = fopen(optarg, "w");
 				if (!breakpoints_ints_fptr) {
@@ -144,6 +245,8 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Missing arguments\n");
 		return 1;
 	}
+
+	getBPB_for_size(disk_size, &bpb);
 
 	bootstrap_file = argv[optind];
 	executable_file = argv[optind+1];
@@ -175,7 +278,7 @@ int main(int argc, char **argv)
 	printf("Payload file type: %s\n", is_exe ? ".EXE" : ".COM");
 	printf("Output file: %s\n", output_file);
 	printf("Sectors per track: %d\n", sectors_per_track);
-	printf("Output file padding: %d B / %.2f kB / %.2f MB)\n", disk_image_size, disk_image_size / 1024.0, disk_image_size / 1024.0 / 1024.0);
+	printf("Output file padding: %d B / %.2f kB / %.2f MB)\n", bpb.disk_image_size, bpb.disk_image_size / 1024.0, bpb.disk_image_size / 1024.0 / 1024.0);
 
 	if (is_exe) {
 		int file_size;
@@ -300,16 +403,85 @@ int main(int argc, char **argv)
 	printf("\tinitial CS 0x%04x\n", initial_cs);
 	printf("\tinitial DS 0x%04x\n", initial_ds);
 	printf("\tinitial SS 0x%04x\n", initial_ss);
-	bootstrap_write(n_sectors, sectors_per_track, DESTINATION_SEGMENT,
+
+	bootstrap_write(n_sectors, DESTINATION_SEGMENT,
 			initial_ip, initial_sp, initial_cs, initial_ds, initial_ss,
+			&bpb,
+			disk_label,
 			fptr_disk);
+
+	if (1)
+	{
+		int root_dir_sectors = bpb.root_dir_entries * 32 / bpb.bytes_per_logical_sector;
+		int track_size = bpb.sectors_per_track * bpb.num_heads;
+
+		first_cluster_sector = bpb.reserved_logical_sectors + bpb.logical_sectors_per_fat * bpb.n_fats + root_dir_sectors;
+
+		printf("First sector: 0x%04x\n", first_cluster_sector);
+		printf("Sectors per track: 0x%04x\n", track_size);
+		if (first_cluster_sector % track_size) {
+			first_cluster_sector = (first_cluster_sector / track_size + 1) * track_size;
+			printf("Target sector: 0x%04x\n", first_cluster_sector);
+		}
+		printf("Payload starting at track 0x%04x\n", first_cluster_sector / track_size);
+		fseek(fptr_disk, first_cluster_sector * bpb.bytes_per_logical_sector, SEEK_SET);
+//		fseek(fptr_disk, 1*512, SEEK_SET);
+	}
+
+	fseek(fptr_disk, first_cluster_sector * bpb.bytes_per_logical_sector, SEEK_SET);
 	fwrite(payload, payload_size, 1, fptr_disk);
-	if (disk_image_size > 512+payload_size) {
-		fseek(fptr_disk, disk_image_size-1, SEEK_SET);
+
+
+	if (bpb.disk_image_size > 512+payload_size) {
+		fseek(fptr_disk, bpb.disk_image_size-1, SEEK_SET);
 		// Pad file size
 		payload[0] = 0;
 		fwrite(payload, 1, 1, fptr_disk);
 	}
+
+	if (1)
+	{
+		int fat_size_bytes = bpb.bytes_per_logical_sector * bpb.logical_sectors_per_fat;
+		uint8_t fat[fat_size_bytes];
+		int cluster;
+		int n_reserved_clusters = (first_cluster_sector * bpb.bytes_per_logical_sector + payload_size) / bpb.bytes_per_logical_sector / bpb.sectors_per_cluster;
+		int directory_offset;
+
+		directory_offset = (bpb.reserved_logical_sectors + bpb.logical_sectors_per_fat * bpb.n_fats) * bpb.bytes_per_logical_sector;
+
+		printf("Payload size: 0x%04x\n", payload_size);
+		printf("Payload first sector: 0x%04x\n", first_cluster_sector);
+		printf("Reserving %d clusters (0x%04x bytes)\n",
+				n_reserved_clusters,
+				n_reserved_clusters * bpb.sectors_per_cluster * bpb.bytes_per_logical_sector);
+
+		memset(fat, 0, sizeof(fat));
+		fat[0] = bpb.media_descriptor;
+		fat[1] = 0xFF;
+		fat[2] = 0xFF;
+		for (cluster=2; cluster<n_reserved_clusters ; cluster++) {
+			int fat_entry = 0xFF7;
+			if (cluster&1) {
+				fat[cluster/2*3+2] = fat_entry >> 4;
+				fat[cluster/2*3+1] |= fat_entry << 4;
+			} else {
+				fat[cluster/2*3] = fat_entry;
+				fat[cluster/2*3+1] = fat_entry>>8;
+			}
+		}
+
+		dos_interrupts = 0;
+		fseek(fptr_disk,
+				bpb.bytes_per_logical_sector * bpb.reserved_logical_sectors, SEEK_SET);
+		fwrite(fat, sizeof(fat), 1, fptr_disk);
+		if (bpb.n_fats > 1)
+			fwrite(fat, sizeof(fat), 1, fptr_disk);
+
+		printf("Directory table offset: 0x%04x\n", directory_offset);
+		fseek(fptr_disk, directory_offset, SEEK_SET);
+		writeVolumeLabel(fptr_disk, disk_label, 0x08, 0, 0, 0, 0);
+	}
+
 
 	fclose(fptr_disk);
 	retval = 0;
