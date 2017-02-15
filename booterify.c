@@ -69,7 +69,7 @@ static void printHelp(void)
 	printf(" -h             Prints help\n");
 	//printf(" -c             Force input file format as .com (default: auto-detect)\n");
 	//printf(" -e             Force input file format as .exe (default: auto-detect)\n");
-	printf(" -f size        Floppy format. Supports 360, 720, 1200 and 1440 sizes.\n");
+	printf(" -f size        Floppy format. Supports 320, 360, 720, 1200 and 1440 sizes.\n");
 	printf(" -l label       Set floppy label. (Default: '%s')\n", DEFAULT_DISK_LABEL);
 	printf("\n");
 	printf("Debugging/Development:\n");
@@ -79,6 +79,20 @@ static void printHelp(void)
 
 int getBPB_for_size(int f, struct bootstrap_bpb *bpb)
 {
+	struct bootstrap_bpb f320k_bpb = {
+		.bytes_per_logical_sector = 512,
+		.sectors_per_cluster = 2,
+		.reserved_logical_sectors = 1,
+		.n_fats = 2,
+		.root_dir_entries = 112,
+		.total_logical_sectors = 8 * 2 * 40, // sectors * heads * tracks
+		.media_descriptor = 0xFF, // 320K
+		.logical_sectors_per_fat = 1,
+		.sectors_per_track = 8,
+		.num_heads = 2,
+
+		.disk_image_size = 320 * 1024,
+	};
 	struct bootstrap_bpb f360k_bpb = {
 		.bytes_per_logical_sector = 512,
 		.sectors_per_cluster = 2,
@@ -140,6 +154,7 @@ int getBPB_for_size(int f, struct bootstrap_bpb *bpb)
 
 	switch(f)
 	{
+		case 320: memcpy(bpb, &f320k_bpb, sizeof(struct bootstrap_bpb)); return 0;
 		case 360: memcpy(bpb, &f360k_bpb, sizeof(struct bootstrap_bpb)); return 0;
 		case 720: memcpy(bpb, &f720k_bpb, sizeof(struct bootstrap_bpb)); return 0;
 		case 1200: memcpy(bpb, &f1200k_bpb, sizeof(struct bootstrap_bpb)); return 0;
