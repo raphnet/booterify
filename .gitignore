@@ -4,3 +4,4 @@ bootsector.map
 *.o
 *.dsk
 *.bin
+.DS_Store
