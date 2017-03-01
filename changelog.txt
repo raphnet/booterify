@@ -1,3 +1,8 @@
+Version 1.3
+ - Disk images now have a standard FAT12 filesystem so
+   besides being bootable, floppies may also contain extra
+   data (.EXE version of the game, documentation, etc...)
+
 Version 1.2
  - Add a hexdump when a potential DOS interrupt call is found
  - Fix incorrect use of load address in some cases
