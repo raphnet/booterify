@@ -57,6 +57,11 @@ static int read_uint16le(FILE *fptr, uint16_t *dst)
 	return 0;
 }
 
+static void printVersion(void)
+{
+	printf("Booterify version %s\n", VERSION);
+}
+
 static void printHelp(void)
 {
 	printf("Usage: ./booterify [options] bootsector.bin executable output.dsk\n");
@@ -218,7 +223,6 @@ int main(int argc, char **argv)
 	unsigned short initial_sp = 0xFFFF;
 	unsigned char sectors_per_track = 9;
 	int opt, i, retval = -1;
-	char *e;
 	const char *bootstrap_file, *executable_file, *output_file;
 	uint16_t exe_header[14];
 	char is_exe;
@@ -230,13 +234,15 @@ int main(int argc, char **argv)
 	const char *disk_label = DEFAULT_DISK_LABEL;
 
 
-	while (-1 != (opt = getopt(argc, argv, "hB:f:l:"))) {
+	while (-1 != (opt = getopt(argc, argv, "hB:f:l:v"))) {
 		switch(opt)
 		{
 			case 'h':
 				printHelp();
 				return 0;
-				break;
+			case 'v':
+				printVersion();
+				return 0;
 			case '?':
 				fprintf(stderr, "Unknown option. Try -h\n");
 				return 1;

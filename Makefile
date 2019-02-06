@@ -1,11 +1,13 @@
 NASM=nasm
 CC=gcc
 LD=$(CC)
+VERSION=1.4
+CFLAGS=-Wall -O0 -DVERSION=\"$(VERSION)\"
 
 all: bootsector.bin booterify exeinfo
 
 bootsector.bin: bootsector.asm
-	nasm $< -fbin -o $@ -O0
+	nasm $< -fbin -o $@ -O0 -DVERSION=\"$(VERSION)\"
 	ls -lh $@
 
 booterify: booterify.o bootstrap.o

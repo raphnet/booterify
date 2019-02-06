@@ -10,6 +10,7 @@ Booterify is a simple bootloader that fits in the first sector of a floppy (512 
 - Detects potential DOS interrupt calls, displays their address and hex dump around the call
 - Can generate a list of breakpoints in bochs syntax for each DOS service call instance
 - Implemented DOS services:
+  - int 21h/AH=02h : Display character
   - int 21h/AH=09h : Display string
   - int 21h/AH=25h : Get interrupt vector
   - int 21h/AH=35h : Set interrupt vector

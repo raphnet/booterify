@@ -314,6 +314,8 @@ int21_35:
 	iret
 %endif
 
+	db "Booterify version ",VERSION,0
+
 section .marker start=0x7dFE
 	db 0x55, 0xaa
 
