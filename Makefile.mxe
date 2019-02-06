@@ -1,0 +1,26 @@
+NASM=nasm
+CC=i686-w64-mingw32.static-gcc
+LD=$(CC)
+
+include version.inc
+
+PRG=bootsector.bin booterify.exe exeinfo.exe
+
+all: $(PRG)
+
+bootsector.bin: bootsector.asm
+	nasm $< -fbin -o $@ -O0
+	ls -lh $@
+
+booterify.exe: booterify.o bootstrap.o
+	$(LD) $(LDFLAGS) $^ -o $@
+
+exeinfo.exe: exeinfo.o
+	$(LD) $(LDFLAGS) $^ -o $@
+
+clean:
+	rm -f bootsector.bin *.o booterify.exe exeinfo.exe
+
+dist:
+	rm -f booterify_win32-$(VERSION).zip
+	zip booterify_win32-$(VERSION).zip $(PRG) *.c *.h *.asm *.map *.txt *.md *.inc bochs-config Makefile*
