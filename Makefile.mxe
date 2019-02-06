@@ -1,15 +1,16 @@
 NASM=nasm
 CC=i686-w64-mingw32.static-gcc
 LD=$(CC)
-
 include version.inc
+CFLAGS=-Wall -O0 -DVERSION=\"$(VERSION)\"
 
 PRG=bootsector.bin booterify.exe exeinfo.exe
 
 all: $(PRG)
 
 bootsector.bin: bootsector.asm
-	nasm $< -fbin -o $@ -O0
+	nasm $< -fbin -o $@ -O0 -DVERSION=\"$(VERSION)\"
+
 	ls -lh $@
 
 booterify.exe: booterify.o bootstrap.o
