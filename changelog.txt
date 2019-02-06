@@ -1,3 +1,9 @@
+Version 1.4
+ - Initialize the command-line fields of the PSP correctly
+   for .COM executables. (Use length of 1 and add a 0D terminator
+   instead of zero'ing everything)
+ - Implement int 21h,02 (DOS putchar)
+
 Version 1.3
  - Disk images now have a standard FAT12 filesystem so
    besides being bootable, floppies may also contain extra
