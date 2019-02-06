@@ -1,7 +1,7 @@
 NASM=nasm
 CC=gcc
 LD=$(CC)
-VERSION=1.4
+include version.inc
 CFLAGS=-Wall -O0 -DVERSION=\"$(VERSION)\"
 
 all: bootsector.bin booterify exeinfo
