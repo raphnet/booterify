@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
 #include <stdint.h>
@@ -368,6 +369,10 @@ int main(int argc, char **argv)
 		// If there are command line options, we could place them
 		// somewhere here like DOS does....
 		memset(payload, 0, 0x100);
+
+		payload[0x80] = 1;	// count of characters in command tail
+		payload[0x81] = 0x0D;	// all characters entered after the program name followed by a CR byte
+
 		payload_size =  fread(payload + 0x100, 1, 0x10001-0x100, fptr_payload);
 		payload_size += 0x100;
 		if (payload_size < 0) {
