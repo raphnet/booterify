@@ -209,12 +209,31 @@ hang:
 
 %ifdef INT21H_HELPERS
 int21:
+	cmp ah, 02h
+	je int21_02
 	cmp ah, 25h
 	je int21_25
 	cmp ah, 35h
 	je int21_35
 	cmp ah, 09h
 	je int21_09
+	iret
+
+	; AH : 02
+	; DL : Character
+int21_02:
+	push ax
+	push bx
+	; Int 10,E : write text in tty mode
+	; AL : Ascii character
+	; BH : Page no
+	; BL : Forground color
+	xor bx,bx
+	mov al, dl
+	mov ah, 0x0e
+	int 10h
+	pop bx
+	pop ax
 	iret
 
 	; AH : 09
