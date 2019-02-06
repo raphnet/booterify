@@ -3,6 +3,8 @@ Version 1.4
    for .COM executables. (Use length of 1 and add a 0D terminator
    instead of zero'ing everything)
  - Implement int 21h,02 (DOS putchar)
+ - Add a version string in the loader and in the tool
+ - Add a makefile for cross-compiling the windows version with MXE
 
 Version 1.3
  - Disk images now have a standard FAT12 filesystem so
