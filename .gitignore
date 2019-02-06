@@ -5,3 +5,6 @@ bootsector.map
 *.dsk
 *.bin
 .DS_Store
+*.exe
+*.zip
+*.swp
