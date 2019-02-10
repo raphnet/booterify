@@ -76,7 +76,9 @@ static void printHelp(void)
 	//printf(" -c             Force input file format as .com (default: auto-detect)\n");
 	//printf(" -e             Force input file format as .exe (default: auto-detect)\n");
 	printf(" -f size        Floppy format. Supports 320, 360, 720, 1200 and 1440 sizes.\n");
+	printf("                Set to 0 to disable BPB (BIOS parameter block) and padding.\n");
 	printf(" -l label       Set floppy label. (Default: '%s')\n", DEFAULT_DISK_LABEL);
+	printf(" -s segment     Configure loader to load program to specified segment (default: 0x%04x)\n", DESTINATION_SEGMENT);
 	printf("\n");
 	printf("Debugging/Development:\n");
 	printf(" -B file        Generate list of breakpoints commands for bochs for all\n");
@@ -232,9 +234,10 @@ int main(int argc, char **argv)
 	int first_cluster_sector = 512;
 	int disk_size = 1440;
 	const char *disk_label = DEFAULT_DISK_LABEL;
+	unsigned short destination_segment = DESTINATION_SEGMENT;
+	int write_bpb = 1;
 
-
-	while (-1 != (opt = getopt(argc, argv, "hB:f:l:v"))) {
+	while (-1 != (opt = getopt(argc, argv, "hB:f:l:vs:"))) {
 		switch(opt)
 		{
 			case 'h':
@@ -249,6 +252,9 @@ int main(int argc, char **argv)
 				break;
 			case 'f':
 				disk_size = atoi(optarg);
+				if (disk_size == 0) {
+					write_bpb = 0;
+				}
 				break;
 			case 'l':
 				disk_label = optarg;
@@ -260,6 +266,10 @@ int main(int argc, char **argv)
 					return 1;
 				}
 				break;
+			case 's':
+				destination_segment = strtol(optarg, NULL, 0);
+				initial_cs = initial_ds = initial_ss = destination_segment;
+				break;
 		}
 	}
 
@@ -268,9 +278,13 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (getBPB_for_size(disk_size, &bpb)) {
-		fprintf(stderr, "Invalid disk size\n");
-		return -1;
+	if (disk_size > 0) {
+		if (getBPB_for_size(disk_size, &bpb)) {
+			fprintf(stderr, "Invalid disk size\n");
+			return -1;
+		}
+	} else {
+		memset(&bpb, 0, sizeof(bpb));
 	}
 
 	bootstrap_file = argv[optind];
@@ -340,8 +354,8 @@ int main(int argc, char **argv)
 		initial_sp = exe_header[INITIAL_SP];
 
 		printf("Relocating...\n");
-		initial_cs = exe_header[PRE_RELOCATE_CS] + DESTINATION_SEGMENT;
-		initial_ss = exe_header[INITIAL_SS] + DESTINATION_SEGMENT;
+		initial_cs = exe_header[PRE_RELOCATE_CS] + destination_segment;
+		initial_ss = exe_header[INITIAL_SS] + destination_segment;
 
 		fseek(fptr_payload, exe_header[RELOCATION_TABLE_OFFSET], SEEK_SET);
 		for (i=0; i<exe_header[RELOCATION_ITEMS]; i++) {
@@ -358,8 +372,8 @@ int main(int argc, char **argv)
 				goto err;
 			}
 			val = payload[addr] + (payload[addr+1] << 8);
-			printf("0x%04x -> 0x%04x\n", val, val + DESTINATION_SEGMENT);
-			val += DESTINATION_SEGMENT;
+			printf("0x%04x -> 0x%04x\n", val, val + destination_segment);
+			val += destination_segment;
 			payload[addr] = val & 0xff;
 			payload[addr+1] = val >> 8;
 		}
@@ -367,7 +381,7 @@ int main(int argc, char **argv)
 		// bootsector.asm always points ES to 0x100 bytes before load image.
 		// But DS will be equal to CS for .COM executables, but for .EXEs, it
 		// must equals ES.
-		initial_ds = DESTINATION_SEGMENT - 0x10;
+		initial_ds = destination_segment - 0x10;
 
 	} else {
 		printf("Reading com file...\n");
@@ -406,7 +420,7 @@ int main(int argc, char **argv)
 				dos_interrupts = 1;
 
 				if (breakpoints_ints_fptr) {
-					fprintf(breakpoints_ints_fptr, "vbreak 0x%04x:0x%04x\n", DESTINATION_SEGMENT, i);
+					fprintf(breakpoints_ints_fptr, "vbreak 0x%04x:0x%04x\n", destination_segment, i);
 				}
 			}
 		}
@@ -427,19 +441,23 @@ int main(int argc, char **argv)
 		n_sectors = payload_size / 512 + 1;
 	}
 	printf("Bootstrap: %d sectors to copy, %d sectors per track\n\tinitial IP 0x%04x\n", n_sectors, sectors_per_track, initial_ip);
-	printf("\tdestination segment 0x%04x\n", DESTINATION_SEGMENT);
+	printf("\tdestination segment 0x%04x\n", destination_segment);
 	printf("\tinitial SP 0x%04x\n", initial_sp);
 	printf("\tinitial CS 0x%04x\n", initial_cs);
 	printf("\tinitial DS 0x%04x\n", initial_ds);
 	printf("\tinitial SS 0x%04x\n", initial_ss);
 
-	bootstrap_write(n_sectors, DESTINATION_SEGMENT,
+	bootstrap_write(n_sectors, destination_segment,
 			initial_ip, initial_sp, initial_cs, initial_ds, initial_ss,
-			&bpb,
+			NULL, // no bios parameter block
 			disk_label,
 			fptr_disk);
 
-	if (1)
+	if (!write_bpb)
+	{
+		fwrite(payload, payload_size, 1, fptr_disk);
+	}
+	else
 	{
 		int root_dir_sectors = bpb.root_dir_entries * 32 / bpb.bytes_per_logical_sector;
 		int track_size = bpb.sectors_per_track * bpb.num_heads;
@@ -455,21 +473,19 @@ int main(int argc, char **argv)
 		printf("Payload starting at track 0x%04x\n", first_cluster_sector / track_size);
 		fseek(fptr_disk, first_cluster_sector * bpb.bytes_per_logical_sector, SEEK_SET);
 //		fseek(fptr_disk, 1*512, SEEK_SET);
-	}
 
-	fseek(fptr_disk, first_cluster_sector * bpb.bytes_per_logical_sector, SEEK_SET);
-	fwrite(payload, payload_size, 1, fptr_disk);
+		/////
+		fseek(fptr_disk, first_cluster_sector * bpb.bytes_per_logical_sector, SEEK_SET);
+		fwrite(payload, payload_size, 1, fptr_disk);
+		/////
 
+		if (bpb.disk_image_size > 512+payload_size) {
+			fseek(fptr_disk, bpb.disk_image_size-1, SEEK_SET);
+			// Pad file size
+			payload[0] = 0;
+			fwrite(payload, 1, 1, fptr_disk);
+		}
 
-	if (bpb.disk_image_size > 512+payload_size) {
-		fseek(fptr_disk, bpb.disk_image_size-1, SEEK_SET);
-		// Pad file size
-		payload[0] = 0;
-		fwrite(payload, 1, 1, fptr_disk);
-	}
-
-	if (1)
-	{
 		int fat_size_bytes = bpb.bytes_per_logical_sector * bpb.logical_sectors_per_fat;
 		uint8_t fat[fat_size_bytes];
 		int cluster;
