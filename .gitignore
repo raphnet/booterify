@@ -4,7 +4,15 @@ bootsector.map
 *.o
 *.dsk
 *.bin
+*.BIN
 .DS_Store
 *.exe
+*.EXE
+*.com
+*.COM
 *.zip
 *.swp
+*.map
+*.jrc
+*.JRC
+*.lst
