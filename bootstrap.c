@@ -49,6 +49,7 @@ int bootstrap_write(unsigned short num_sectors_to_copy,
 		return -1;
 	}
 
+	SET_16LE(DST_SEGMENT, dst_segment);
 	bootstrap_buf[SECTORS_TO_COPY] = num_sectors_to_copy & 0xff;
 	bootstrap_buf[SECTORS_TO_COPY+1] = num_sectors_to_copy >> 8;
 
