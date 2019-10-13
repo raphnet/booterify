@@ -36,11 +36,13 @@ start:
 	mov ax, cs
 	mov ds, ax
 
+%ifdef TRACE
 	; Setup stack
 	mov ax, [destination_segment]
 	dec ax
 	mov ss, ax
 	mov sp, 15
+%endif
 
 %ifdef INT21H_HELPERS
 	; Install our handler at 0000:0084
@@ -54,6 +56,7 @@ start:
 	pop ds
 %endif
 
+%ifdef TRACE
 	; Trace
 	mov ah, 00Eh
 	mov al, '1'
@@ -61,6 +64,7 @@ start:
 	mov bl, 1
 	mov cx, 1
 	int 10h
+%endif
 
 	; ES:DI is the destination
 	mov ax, [destination_segment]
@@ -94,12 +98,14 @@ start:
 
 
 loading_done:
+%ifdef TRACE
 	mov ah, 00Eh
 	mov al, '2'
 	mov bh, 0
 	mov bl, 1
 	mov cx, 1
 	int 10h
+%endif
 
 start_payload:
 
