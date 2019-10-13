@@ -267,7 +267,7 @@ void printHelp(void)
 	printf(" -h        Print usage information and exit\n");
 	printf(" -v        Enable verbose output\n");
 	printf(" -p        Compute CRC and patch the file\n");
-	printf(" -s        Fix the byte based on input file size\n");
+	printf(" -s        Fix the size byte based on input file size\n");
 	printf(" -i        Display information about the file (default)\n");
 	printf(" -o file   Write (modified) ROM to file (default: Binary format)\n");
 	printf(" -j        Enable JRC format output (use with -o)\n");
