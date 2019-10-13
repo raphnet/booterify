@@ -5,10 +5,14 @@ cpu 8086
 
 %define INT21H_HELPERS
 
+; If enabled, the cartridge code only runs if no bootable
+; disk is found. (Like the BASIC cartridge) 
+;%define INT18_MODE
+
 ; Start after the BIOS Data Area
 ; use one paragraph for the stack (SS=0050)
 
-%define DESTINATION_SEGMENT	0051H
+%define DESTINATION_SEGMENT	0052H
 
 ; Payload start must be at the first
 ; sector of track 1
@@ -19,7 +23,7 @@ section .text
 
 	db 0x55, 0xAA	; Marker
 	db 0			; Size / 512. Will be patched by jrromchk
-	jmp start		; Code follows
+	jmp init		; Code follows
 
 	times 58 db 0 ; Todo : Align to match bootsector.asm (40h)
 
@@ -30,6 +34,35 @@ initial_sp: dw 0FFFEh
 initial_cs: dw DESTINATION_SEGMENT
 initial_ds: dw DESTINATION_SEGMENT
 initial_ss: dw DESTINATION_SEGMENT
+
+
+init:
+	push ax
+	push ds
+
+%ifdef INT18_MODE
+	; Install the start routine at INT 18h. The cartridge code
+	; will run if there is no bootable diskette. (Like the BASIC cartridge does)
+	xor ax, ax
+	mov ds, ax
+	mov ax, start
+	mov word [18h * 4], ax
+	mov ax, cs
+	mov word [18h * 4 + 2], ax
+%else
+	; First enable the interrupt timer. Games that use the timer
+	; may need it! Normally it's done at F000:08B7 after the floppy test.
+	in al, 21h
+	and al, 0xFE
+	out 21h, al
+	pop ds
+	pop ax
+	jmp start
+%endif
+
+	pop ds
+	pop ax
+	retf
 
 start:
 	; Setup data segment to 0000
@@ -129,7 +162,7 @@ start_payload:
 	mov dx, [initial_ds]
 	mov ds, dx
 
-
+	sti
 final_jump:
 	retf
 
