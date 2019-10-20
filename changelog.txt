@@ -1,3 +1,7 @@
+Version 1.6
+ - Add a loader for PCjr cartridge (pcjrloader.asm)
+ - Add the jrromchk tool, to convert between .JRC and binary PCjr ROM formats
+
 Version 1.5
  - Bios parameter block and output file padding can now be disabled using -f 0
 
