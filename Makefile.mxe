@@ -4,7 +4,7 @@ LD=$(CC)
 include version.inc
 CFLAGS=-Wall -O0 -DVERSION=\"$(VERSION)\"
 
-PRG=bootsector.bin booterify.exe exeinfo.exe jrromchk.exe pcjrloader.bin
+PRG=bootsector.bin booterify.exe exeinfo.exe jrromchk.exe pcjrloader.bin bin2exe.exe
 
 all: $(PRG)
 
@@ -24,6 +24,10 @@ exeinfo.exe: exeinfo.o
 
 jrromchk.exe: jrromchk.o
 	$(LD) $(LDFLAGS) $^ -o $@
+
+bin2exe.exe: bin2exe.o
+	$(LD) $(LDFLAGS) $^ -o $@
+
 
 clean:
 	rm -f bootsector.bin *.o booterify.exe exeinfo.exe jrromchk.exe pcjrloader.bin
