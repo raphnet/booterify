@@ -4,7 +4,7 @@ LD=$(CC)
 include version.inc
 CFLAGS=-Wall -O0 -DVERSION=\"$(VERSION)\"
 
-all: bootsector.bin booterify exeinfo jrromchk pcjrloader.bin
+all: bootsector.bin booterify exeinfo jrromchk pcjrloader.bin bin2exe
 
 bootsector.bin: bootsector.asm
 	nasm $< -fbin -o $@ -O0 -DVERSION=\"$(VERSION)\" -l bootsector.lst
@@ -21,6 +21,9 @@ exeinfo: exeinfo.o
 	$(LD) $(LDFLAGS) $^ -o $@
 
 jrromchk: jrromchk.o
+	$(LD) $(LDFLAGS) $^ -o $@
+
+bin2exe: bin2exe.o
 	$(LD) $(LDFLAGS) $^ -o $@
 
 clean:
