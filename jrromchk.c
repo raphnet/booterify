@@ -32,7 +32,7 @@ void loadJrcHeader(uint8_t *data, struct jrc_header *dst)
 	memset(dst, 0, sizeof(struct jrc_header));
 	memcpy(dst->signature, data, sizeof(dst->signature)-1);
 	memcpy(dst->creator, data+27, sizeof(dst->creator)-1);
-	memcpy(dst->comment, data+59, sizeof(dst->creator)-1);
+	memcpy(dst->comment, data+59, sizeof(dst->comment)-1);
 	dst->version[0] = data[460];
 	dst->version[1] = data[461];
 	dst->address = data[462] | (data[463] << 8);
